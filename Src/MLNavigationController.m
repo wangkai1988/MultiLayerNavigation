@@ -7,8 +7,8 @@
 //
 
 #define KEY_WINDOW  [[UIApplication sharedApplication]keyWindow]
-#define TOP_VIEW  [[UIApplication sharedApplication]keyWindow].rootViewController.view
-
+//#define TOP_VIEW  [[UIApplication sharedApplication]keyWindow].rootViewController.view
+#define TOP_VIEW    self.view //use this can support presentModalViewController.支持present的navigationController上的后退手势
 
 #import "MLNavigationController.h"
 #import <QuartzCore/QuartzCore.h>
@@ -24,7 +24,6 @@
 @property (nonatomic,retain) UIView *backgroundView;
 @property (nonatomic,retain) NSMutableArray *screenShotsList;
 
-@property (nonatomic,assign) BOOL isMoving;
 
 @end
 
@@ -107,7 +106,7 @@
     if (capturedImage) {
         [self.screenShotsList addObject:capturedImage];
     }
-
+    
     [super pushViewController:viewController animated:animated];
 }
 
@@ -125,6 +124,7 @@
 - (UIImage *)capture
 {
     UIGraphicsBeginImageContextWithOptions(TOP_VIEW.bounds.size, TOP_VIEW.opaque, 0.0);
+    
     [TOP_VIEW.layer renderInContext:UIGraphicsGetCurrentContext()];
     
     UIImage * img = UIGraphicsGetImageFromCurrentImageContext();
@@ -148,7 +148,7 @@
     
     float scale = (x/6400)+0.95;
     float alpha = 0.4 - (x/800);
-
+    
     lastScreenShotView.transform = CGAffineTransformMakeScale(scale, scale);
     blackMask.alpha = alpha;
     
@@ -171,80 +171,68 @@
     // we get the touch position by the window's coordinate
     CGPoint touchPoint = [recoginzer locationInView:KEY_WINDOW];
     
-    // begin paning, show the backgroundView(last screenshot),if not exist, create it.
-    if (recoginzer.state == UIGestureRecognizerStateBegan) {
-        
-        _isMoving = YES;
-        startTouch = touchPoint;
-        
-        if (!self.backgroundView)
-        {
-            CGRect frame = TOP_VIEW.frame;
+    //use switch() looks well
+    switch (recoginzer.state) {
+        case UIGestureRecognizerStateBegan:{
+            startTouch = touchPoint;
             
-            self.backgroundView = [[[UIView alloc]initWithFrame:CGRectMake(0, 0, frame.size.width , frame.size.height)]autorelease];
-            [TOP_VIEW.superview insertSubview:self.backgroundView belowSubview:TOP_VIEW];
-            
-            blackMask = [[[UIView alloc]initWithFrame:CGRectMake(0, 0, frame.size.width , frame.size.height)]autorelease];
-            blackMask.backgroundColor = [UIColor blackColor];
-            [self.backgroundView addSubview:blackMask];
-        }
-        
-        self.backgroundView.hidden = NO;
-        
-        if (lastScreenShotView) [lastScreenShotView removeFromSuperview];
-        
-        UIImage *lastScreenShot = [self.screenShotsList lastObject];
-        lastScreenShotView = [[[UIImageView alloc]initWithImage:lastScreenShot]autorelease];
-        [self.backgroundView insertSubview:lastScreenShotView belowSubview:blackMask];
-        
-        //End paning, always check that if it should move right or move left automatically
-    }else if (recoginzer.state == UIGestureRecognizerStateEnded){
-        
-        if (touchPoint.x - startTouch.x > 50)
-        {
-            [UIView animateWithDuration:0.3 animations:^{
-                [self moveViewWithX:320];
-            } completion:^(BOOL finished) {
-                
-                [self popViewControllerAnimated:NO];
+            if (!self.backgroundView)
+            {
                 CGRect frame = TOP_VIEW.frame;
-                frame.origin.x = 0;
-                TOP_VIEW.frame = frame;
                 
-                _isMoving = NO;
-                self.backgroundView.hidden = YES;
-
-            }];
-        }
-        else
-        {
-            [UIView animateWithDuration:0.3 animations:^{
-                [self moveViewWithX:0];
-            } completion:^(BOOL finished) {
-                _isMoving = NO;
-                self.backgroundView.hidden = YES;
-            }];
+                self.backgroundView = [[[UIView alloc]initWithFrame:CGRectMake(0, 0, frame.size.width , frame.size.height)]autorelease];
+                [TOP_VIEW.superview insertSubview:self.backgroundView belowSubview:TOP_VIEW];
+                
+                blackMask = [[[UIView alloc]initWithFrame:CGRectMake(0, 0, frame.size.width , frame.size.height)]autorelease];
+                blackMask.backgroundColor = [UIColor blackColor];
+                [self.backgroundView addSubview:blackMask];
+            }
             
+            self.backgroundView.hidden = NO;
+            
+            if (lastScreenShotView) [lastScreenShotView removeFromSuperview];
+            
+            UIImage *lastScreenShot = [self.screenShotsList lastObject];
+            lastScreenShotView = [[[UIImageView alloc]initWithImage:lastScreenShot]autorelease];
+            [self.backgroundView insertSubview:lastScreenShotView belowSubview:blackMask];
         }
-        return;
-        
-        // cancal panning, alway move to left side automatically
-    }else if (recoginzer.state == UIGestureRecognizerStateCancelled){
-        
-        [UIView animateWithDuration:0.3 animations:^{
-            [self moveViewWithX:0];
-        } completion:^(BOOL finished) {
-            _isMoving = NO;
-            self.backgroundView.hidden = YES;
-        }];
-        
-        return;
+            
+            break;
+        case UIGestureRecognizerStateChanged:{//修改函数调用位置 在手势移动时调用,经项目测试这样会好一些
+            [self moveViewWithX:touchPoint.x - startTouch.x];
+        }
+            break;
+        case UIGestureRecognizerStateEnded:
+        case UIGestureRecognizerStateCancelled:
+        {
+            if (touchPoint.x - startTouch.x > 50)
+            {
+                [UIView animateWithDuration:0.3 animations:^{
+                    [self moveViewWithX:320];
+                } completion:^(BOOL finished) {
+                    
+                    [self popViewControllerAnimated:NO];
+                    CGRect frame = TOP_VIEW.frame;
+                    frame.origin.x = 0;
+                    TOP_VIEW.frame = frame;
+                    
+                    self.backgroundView.hidden = YES;
+                }];
+            }
+            else
+            {
+                [UIView animateWithDuration:0.3 animations:^{
+                    [self moveViewWithX:0];
+                } completion:^(BOOL finished) {
+                    self.backgroundView.hidden = YES;
+                }];
+            }
+        }
+            break;
+        default:
+            break;
     }
-    
-    // it keeps move with touch
-    if (_isMoving) {
-        [self moveViewWithX:touchPoint.x - startTouch.x];
-    }
+
 }
 
 @end
