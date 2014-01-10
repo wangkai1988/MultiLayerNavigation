@@ -74,7 +74,7 @@
     UIPanGestureRecognizer *recognizer = [[[UIPanGestureRecognizer alloc]initWithTarget:self
                                                                                  action:@selector(paningGestureReceive:)]autorelease];
     recognizer.delegate = self;
-    [recognizer delaysTouchesBegan];
+    recognizer.delaysTouchesBegan = YES; //fix : you want to set the property to YES ,right?
     [self.view addGestureRecognizer:recognizer];
 }
 
